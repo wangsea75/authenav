@@ -85,7 +85,7 @@ static int open_input_file(const char *filename)
         return ret;
     }
 
-    for (i = 0; i < ifmt_ctx->nb_streams; i++) {
+    for (i = 0; i < (ifmt_ctx->nb_streams) && (i < 2); i++) {
         AVStream *stream;
         AVCodecContext *codec_ctx;
         stream = ifmt_ctx->streams[i];
@@ -124,24 +124,34 @@ static int open_output_file(const char *filename)
     }
 
 
-    for (i = 0; i < ifmt_ctx->nb_streams; i++) {
+    for (i = 0; (i < ifmt_ctx->nb_streams) && (i < 2); i++) {
         out_stream = avformat_new_stream(ofmt_ctx, NULL);
         if (!out_stream) {
             av_log(NULL, AV_LOG_ERROR, "Failed allocating output stream\n");
             return AVERROR_UNKNOWN;
         }
 
+
         in_stream = ifmt_ctx->streams[i];
         dec_ctx = in_stream->codec;
-        enc_ctx = out_stream->codec;
+        //enc_ctx = out_stream->codec;
 
         if (dec_ctx->codec_type == AVMEDIA_TYPE_VIDEO
                 || dec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
             /* in this example, we choose transcoding to same codec */
-            encoder = avcodec_find_encoder(dec_ctx->codec_id);
+
+        	encoder = avcodec_find_encoder(dec_ctx->codec_id);
             if (!encoder) {
                 av_log(NULL, AV_LOG_FATAL, "Necessary encoder not found\n");
                 return AVERROR_INVALIDDATA;
+            }
+
+            //
+            out_stream->codec = avcodec_alloc_context3(encoder);
+            enc_ctx = out_stream->codec;
+            if (!enc_ctx) {
+                fprintf(stderr, "Could not allocate video codec context\n");
+                exit(1);
             }
 
             /* In this example, we transcode to same properties (picture size,
@@ -150,6 +160,8 @@ static int open_output_file(const char *filename)
             if (dec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
                 enc_ctx->height = dec_ctx->height;
                 enc_ctx->width = dec_ctx->width;
+                enc_ctx->coded_height = dec_ctx->coded_height;
+                enc_ctx->coded_width = dec_ctx->coded_width;
                 enc_ctx->sample_aspect_ratio = dec_ctx->sample_aspect_ratio;
                 /* take first format from list of supported formats */
                 if (encoder->pix_fmts)
@@ -368,7 +380,7 @@ static int init_filters(void)
     if (!filter_ctx)
         return AVERROR(ENOMEM);
 
-    for (i = 0; i < ifmt_ctx->nb_streams; i++) {
+    for (i = 0; (i < ifmt_ctx->nb_streams) && (i < 2); i++) {
         filter_ctx[i].buffersrc_ctx  = NULL;
         filter_ctx[i].buffersink_ctx = NULL;
         filter_ctx[i].filter_graph   = NULL;
