@@ -219,6 +219,7 @@ int main(int argc, char **argv)
     size_t slen = 0;
 	FILE *kfile = NULL;
 	int rc;
+	uint8_t* data_to_sign = NULL;
 
 	SIG_SEI_NAL nal;
 	init_sig_sei_nal(&nal);
