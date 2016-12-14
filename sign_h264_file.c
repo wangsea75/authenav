@@ -289,13 +289,6 @@ int main(int argc, char **argv)
         goto end;
     }
 
-    //
-
-/*    AVPacket tmp_pkt;
-    uint8_t sei[] = {0x00, 0x00, 0x00, 0x16, 0x06, 0x05,
-    				 0x13, 0xcf, 0xfd, 0x43, 0x20, 0x65, 0x40, 0xb6, 0xa4, 0x11, 0xd4, 0x75, 0x9b, 0x2c, 0xad, 0x68,
-    				 'a', 'b', 'c', 'd'};*/
-
     /*read sign key from a PEM file*/
 	if( (kfile = fopen(argv[3], "rt")) == NULL)
 		exit(1);
@@ -309,6 +302,8 @@ int main(int argc, char **argv)
 		exit(1);
 
 	size_t org_pkt_size; //save original packet size
+	size_t size_data_to_sign;
+	uint8_t* buf_to_append = NULL; //buff address after appending
 
     while (1) {
         AVStream *in_stream, *out_stream;
@@ -316,6 +311,12 @@ int main(int argc, char **argv)
         ret = av_read_frame(ifmt_ctx, &pkt);
         if (ret < 0)
             break;
+
+        /*prepare data to sign*/
+        size_data_to_sign = pkt.size + sizeof(pkt.pts);
+        data_to_sign = malloc(size_data_to_sign);
+        buf_to_append = append(data_to_sign, pkt.data, pkt.size);
+        buf_to_append = append(buf_to_append, &(pkt.pts), sizeof(pkt.pts));
 
         in_stream  = ifmt_ctx->streams[pkt.stream_index];
         out_stream = ofmt_ctx->streams[pkt.stream_index];
@@ -327,7 +328,8 @@ int main(int argc, char **argv)
         av_grow_packet(&pkt, sizeof(SIG_SEI_NAL));
 
         /* sign the data in the packet read */
-        rc = sign_it(pkt.data, org_pkt_size, &sig, &slen, skey);
+        //rc = sign_it(pkt.data, org_pkt_size, &sig, &slen, skey);
+        rc = sign_it(data_to_sign, sizeof(data_to_sign), &sig, &slen, skey);
 		assert(rc == 0);
 		if(rc == 0) {
 			printf("Created signature\n");
@@ -358,6 +360,7 @@ int main(int argc, char **argv)
             break;
         }
         av_packet_unref(&pkt);
+        free(data_to_sign);
     }
 
     av_write_trailer(ofmt_ctx);

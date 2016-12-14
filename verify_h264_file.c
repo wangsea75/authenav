@@ -280,14 +280,12 @@ static uint8_t *append(uint8_t *buf, const uint8_t *src, int size)
 
 int main(int argc, char **argv)
 {
-    AVOutputFormat *ofmt = NULL;
     AVFormatContext *ifmt_ctx = NULL, *ofmt_ctx = NULL;
     AVPacket pkt;
-    const char *in_filename, *out_filename;
+    const char *in_filename;
     int ret, i;
 
-    EVP_PKEY *skey = NULL, *vkey = NULL;
-	uint8_t* sig = NULL;
+    EVP_PKEY *vkey = NULL;
     size_t slen = 0;
 	FILE *kfile = NULL;
 	int rc;
@@ -377,6 +375,9 @@ int main(int argc, char **argv)
 		exit(1);
 
 	size_t org_pkt_size; //save original packet size
+	uint8_t* data_to_verify = NULL;
+	size_t size_data_to_verify;
+	uint8_t* buf_to_append = NULL; //buff address after appending
 
     while (1) {
         AVStream *in_stream, *out_stream;
@@ -385,12 +386,22 @@ int main(int argc, char **argv)
         if (ret < 0)
             break;
 
+        /*prepare data to verify*/
+        size_data_to_verify = pkt.size - sizeof(SIG_SEI_NAL) + sizeof(pkt.pts);
+        data_to_verify = malloc(size_data_to_verify);
+        buf_to_append = append(data_to_verify, pkt.data, pkt.size - sizeof(SIG_SEI_NAL));
+        buf_to_append = append(buf_to_append, &(pkt.pts), sizeof(pkt.pts));
+
+        in_stream  = ifmt_ctx->streams[pkt.stream_index];
+        //out_stream = ofmt_ctx->streams[pkt.stream_index];
+        log_packet(ifmt_ctx, &pkt, "in");
+
         in_stream  = ifmt_ctx->streams[pkt.stream_index];
         //out_stream = ofmt_ctx->streams[pkt.stream_index];
         log_packet(ifmt_ctx, &pkt, "in");
 
         //print_it("signature", pkt.data + pkt.size - sizeof(SIG_SEI_NAL) + 22, SIGNATURE_LEN);
-        rc = verify_it(pkt.data, pkt.size - sizeof(SIG_SEI_NAL), pkt.data + pkt.size - sizeof(SIG_SEI_NAL) + 22, SIGNATURE_LEN, vkey);
+        rc = verify_it(data_to_verify, sizeof(data_to_verify), pkt.data + pkt.size - sizeof(SIG_SEI_NAL) + 22, SIGNATURE_LEN, vkey);
 		if(rc == 0) {
 			printf("Verified signature\n");
 		} else {
