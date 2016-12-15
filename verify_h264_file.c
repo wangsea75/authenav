@@ -314,57 +314,6 @@ int main(int argc, char **argv)
 
     av_dump_format(ifmt_ctx, 0, in_filename, 0);
 
-    /*avformat_alloc_output_context2(&ofmt_ctx, NULL, NULL, out_filename);
-    if (!ofmt_ctx) {
-        fprintf(stderr, "Could not create output context\n");
-        ret = AVERROR_UNKNOWN;
-        goto end;
-    }
-
-    ofmt = ofmt_ctx->oformat;
-
-    for (i = 0; i < ifmt_ctx->nb_streams; i++) {
-        AVStream *in_stream = ifmt_ctx->streams[i];
-        AVStream *out_stream = avformat_new_stream(ofmt_ctx, in_stream->codec->codec);
-        if (!out_stream) {
-            fprintf(stderr, "Failed allocating output stream\n");
-            ret = AVERROR_UNKNOWN;
-            goto end;
-        }
-
-        ret = avcodec_copy_context(out_stream->codec, in_stream->codec);
-        if (ret < 0) {
-            fprintf(stderr, "Failed to copy context from input to output stream codec context\n");
-            goto end;
-        }
-        out_stream->codec->codec_tag = 0;
-        if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
-            out_stream->codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-    }
-    av_dump_format(ofmt_ctx, 0, out_filename, 1);
-
-    if (!(ofmt->flags & AVFMT_NOFILE)) {
-        ret = avio_open(&ofmt_ctx->pb, out_filename, AVIO_FLAG_WRITE);
-        if (ret < 0) {
-            fprintf(stderr, "Could not open output file '%s'", out_filename);
-            goto end;
-        }
-    }
-
-    ret = avformat_write_header(ofmt_ctx, NULL);
-    if (ret < 0) {
-        fprintf(stderr, "Error occurred when opening output file\n");
-        goto end;
-    }*/
-
-    //
-
-/*    AVPacket tmp_pkt;
-    uint8_t sei[] = {0x00, 0x00, 0x00, 0x16, 0x06, 0x05,
-    				 0x13, 0xcf, 0xfd, 0x43, 0x20, 0x65, 0x40, 0xb6, 0xa4, 0x11, 0xd4, 0x75, 0x9b, 0x2c, 0xad, 0x68,
-    				 'a', 'b', 'c', 'd'};*/
-
-
 	/*read sign key from a PEM file*/
 	if( (kfile = fopen(argv[2], "r")) == NULL)
 		exit(1);
@@ -378,6 +327,8 @@ int main(int argc, char **argv)
 	uint8_t* data_to_verify = NULL;
 	size_t size_data_to_verify;
 	uint8_t* buf_to_append = NULL; //buff address after appending
+	int frame_num = 0;
+
 
     while (1) {
         AVStream *in_stream, *out_stream;
@@ -386,6 +337,9 @@ int main(int argc, char **argv)
         if (ret < 0)
             break;
 
+        frame_num = pkt.pts/pkt.duration;
+        AVRational* time_base = &ifmt_ctx->streams[pkt.stream_index]->time_base;
+
         /*prepare data to verify*/
         size_data_to_verify = pkt.size - sizeof(SIG_SEI_NAL) + sizeof(pkt.pts);
         data_to_verify = malloc(size_data_to_verify);
@@ -393,19 +347,20 @@ int main(int argc, char **argv)
         buf_to_append = append(buf_to_append, &(pkt.pts), sizeof(pkt.pts));
 
         in_stream  = ifmt_ctx->streams[pkt.stream_index];
-        //out_stream = ofmt_ctx->streams[pkt.stream_index];
-        log_packet(ifmt_ctx, &pkt, "in");
+
+        //log_packet(ifmt_ctx, &pkt, "in");
 
         in_stream  = ifmt_ctx->streams[pkt.stream_index];
-        //out_stream = ofmt_ctx->streams[pkt.stream_index];
-        log_packet(ifmt_ctx, &pkt, "in");
+
+        //log_packet(ifmt_ctx, &pkt, "in");
 
         //print_it("signature", pkt.data + pkt.size - sizeof(SIG_SEI_NAL) + 22, SIGNATURE_LEN);
         rc = verify_it(data_to_verify, sizeof(data_to_verify), pkt.data + pkt.size - sizeof(SIG_SEI_NAL) + 22, SIGNATURE_LEN, vkey);
 		if(rc == 0) {
-			printf("Verified signature\n");
+			printf("帧号：%5d，pts_time:%10s，已验证的签名者：摄像机 36542\n", frame_num, av_ts2timestr(pkt.pts, time_base));
 		} else {
-			printf("Failed to verify signature, return code %d\n", rc);
+			printf("帧号：%5d，pts_time:%10s，**** 签名验证失败！摄像机 36542。内容可能已损坏或被篡改！ ****\n", frame_num, av_ts2timestr(pkt.pts, time_base));
+			//log_packet(ifmt_ctx, &pkt, "in");
 		}
 
         /*copy packet
