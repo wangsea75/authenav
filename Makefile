@@ -13,6 +13,9 @@ LDLIBS := "/usr/local/lib/libcrypto.a" $(shell pkg-config --libs $(FFMPEG_LIBS))
 
 EXAMPLES=       sign_video                 \
 				verify_video			   \
+				transcoding				   \
+				sign_h264_file             \
+				verify_h264_file           \
 
 OBJS=$(addsuffix .o,$(EXAMPLES))
 
